@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   evaluate,
   hoursPerDay,
+  isAlternateOffDay,
   monthStats,
+  validAlternateFriday,
   workdayCount,
   type Evaluation,
   type Settings,
@@ -30,6 +32,8 @@ interface Stored {
   holidayOn: Record<string, boolean>;
   leave: string[];
   pairStart: Record<string, number>;
+  altFriday?: boolean;
+  altFridayRef?: string;
 }
 
 const num = (s: string) => {
@@ -65,6 +69,8 @@ export default function BonusApp() {
   const [holidayOn, setHolidayOn] = useState<Record<string, boolean>>(defaultHolidayOn());
   const [leave, setLeave] = useState<Set<string>>(new Set());
   const [pairStart, setPairStart] = useState<Record<string, number>>({});
+  const [altFriday, setAltFriday] = useState(false);
+  const [altFridayRef, setAltFridayRef] = useState("");
 
   // Laden en opslaan: alleen lokaal in de browser.
   useEffect(() => {
@@ -81,6 +87,8 @@ export default function BonusApp() {
         if (s.holidayOn) setHolidayOn({ ...defaultHolidayOn(), ...s.holidayOn });
         if (Array.isArray(s.leave)) setLeave(new Set(s.leave));
         if (s.pairStart) setPairStart(s.pairStart);
+        if (typeof s.altFriday === "boolean") setAltFriday(s.altFriday);
+        if (typeof s.altFridayRef === "string") setAltFridayRef(s.altFridayRef);
       }
     } catch {
       /* opslag niet beschikbaar: geen probleem */
@@ -99,12 +107,14 @@ export default function BonusApp() {
         holidayOn,
         leave: [...leave],
         pairStart,
+        altFriday,
+        altFridayRef,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
       /* negeren */
     }
-  }, [loaded, salary, hours, rate, workdays, holidayOn, leave, pairStart]);
+  }, [loaded, salary, hours, rate, workdays, holidayOn, leave, pairStart, altFriday, altFridayRef]);
 
   const settings: Settings = useMemo(
     () => ({
@@ -113,12 +123,20 @@ export default function BonusApp() {
       rate: num(rate),
       workdays,
       holidayOn,
+      alternateFriday: altFriday && workdays[4] ? altFridayRef || null : null,
     }),
-    [salary, hours, rate, workdays, holidayOn],
+    [salary, hours, rate, workdays, holidayOn, altFriday, altFridayRef],
   );
 
+  const altActive = altFriday && workdays[4];
+  const altInvalid = altActive && !validAlternateFriday(altFridayRef);
+
   const ready =
-    settings.fulltimeSalary > 0 && settings.hoursPerWeek > 0 && settings.rate > 0 && workdayCount(settings) > 0;
+    settings.fulltimeSalary > 0 &&
+    settings.hoursPerWeek > 0 &&
+    settings.rate > 0 &&
+    workdayCount(settings) > 0 &&
+    !altInvalid;
 
   const { year, month } = view;
   const yearKey = String(year);
@@ -238,8 +256,34 @@ export default function BonusApp() {
               </label>
             ))}
           </div>
+          {workdays[4] && (
+            <div className="mt-3">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={altFriday} onChange={() => setAltFriday((v) => !v)} />
+                Ik ben om de week op vrijdag vrij
+              </label>
+              {altFriday && (
+                <div className="mt-2 max-w-xs">
+                  <label htmlFor="altref" className="block text-sm font-medium">
+                    Een vrije vrijdag
+                  </label>
+                  <input id="altref" type="date" className={input} value={altFridayRef}
+                    onChange={(e) => setAltFridayRef(e.target.value)}
+                    aria-describedby="altref-hint" aria-invalid={altInvalid || undefined} />
+                  <p id="altref-hint" className={`mt-1 text-xs ${altInvalid ? "text-red-800" : "text-slate-600"}`}>
+                    {altInvalid
+                      ? "Kies een datum die op een vrijdag valt. Dit mag een vrije vrijdag uit het verleden of de toekomst zijn."
+                      : "Kies een vrijdag waarop je vrij bent. Elke 2 weken daarvoor en daarna is ook vrij."}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           {hpd > 0 && (
-            <p className="mt-2 text-sm text-slate-700">Dat is {dec(hpd)} declarabele uur per werkdag.</p>
+            <p className="mt-2 text-sm text-slate-700">
+              Dat is {dec(hpd)} declarabele uur per werkdag
+              {altActive && !altInvalid ? " (gemiddeld 4,5 dag per week bij om de week vrij op vrijdag)" : ""}.
+            </p>
           )}
         </fieldset>
 
@@ -291,10 +335,12 @@ export default function BonusApp() {
                   const isWork = wi <= 4 && settings.workdays[wi];
                   const onLeave = leave.has(iso);
                   const base = "flex h-14 flex-col items-center justify-center rounded-md border text-sm sm:h-16";
-                  if (!isWork) {
+                  if (!isWork || isAlternateOffDay(iso, settings)) {
                     return (
-                      <div key={iso} className={`${base} border-transparent bg-slate-100 text-slate-500`}>
+                      <div key={iso} className={`${base} border-transparent bg-slate-100 text-slate-500`}
+                        aria-label={isWork ? `${longDate(iso)}: vrij (om de week)` : undefined}>
                         <span>{day}</span>
+                        {isWork && <span className="text-[10px]">vrij</span>}
                         {holName && <span className="px-0.5 text-[10px] leading-tight">{holName}</span>}
                       </div>
                     );

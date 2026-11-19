@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { easterSunday, holidayList } from "./holidays.ts";
-import { evaluate, monthStats, type Settings } from "./calc.ts";
+import { evaluate, hoursPerDay, isAlternateOffDay, monthStats, type Settings } from "./calc.ts";
 import { defaultHolidayOn } from "./holidays.ts";
 
 const iso = (y: number, id: string) =>
@@ -33,6 +33,7 @@ const base: Settings = {
   rate: 100,
   workdays: [true, true, true, true, true],
   holidayOn: defaultHolidayOn(),
+  alternateFriday: null,
 };
 
 test("januari 2026: 21 declarabele dagen (1 jan is feestdag)", () => {
@@ -89,4 +90,32 @@ test("twee maanden samen: drempel 5x", () => {
   const ev = evaluate([a, b], base);
   assert.equal(ev.threshold, 20000);
   assert.equal(ev.months, 2);
+});
+
+test("36 uur, om de vrijdag vrij: 8 uur per dag, vrije vrijdagen overgeslagen", () => {
+  // 20 nov 2026 is een vrijdag (vrij); 4 dec, 18 dec, 6 nov ook. 13 nov en 27 nov werk je.
+  const s: Settings = { ...base, hoursPerWeek: 36, alternateFriday: "2026-11-20" };
+  assert.equal(hoursPerDay(s), 8);
+  assert.equal(isAlternateOffDay("2026-11-20", s), true);
+  assert.equal(isAlternateOffDay("2026-11-06", s), true);
+  assert.equal(isAlternateOffDay("2026-12-04", s), true);
+  assert.equal(isAlternateOffDay("2026-11-13", s), false);
+  assert.equal(isAlternateOffDay("2026-11-27", s), false);
+  // Werkdagen november 2026 (ma-vr = 21) minus vrije vrijdagen (6 en 20) minus 0 feestdagen = 19
+  const st = monthStats(2026, 11, s, new Set());
+  assert.equal(st.billableDays, 19);
+  assert.equal(st.hours, 152);
+});
+
+test("om-de-week-vrijdag werkt over jaargrenzen heen", () => {
+  const s: Settings = { ...base, hoursPerWeek: 36, alternateFriday: "2026-11-20" };
+  assert.equal(isAlternateOffDay("2027-01-01", s), true); // 6 weken later... 42 dagen
+  assert.equal(isAlternateOffDay("2025-11-07", s), true); // 378 dagen eerder = 27 x 14
+  assert.equal(isAlternateOffDay("2025-11-14", s), false);
+});
+
+test("ongeldige referentie (geen vrijdag) wordt genegeerd", () => {
+  const s: Settings = { ...base, hoursPerWeek: 36, alternateFriday: "2026-11-19" };
+  assert.equal(hoursPerDay(s), 7.2);
+  assert.equal(isAlternateOffDay("2026-11-20", s), false);
 });

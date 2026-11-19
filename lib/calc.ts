@@ -1,4 +1,4 @@
-import { daysInMonth, holidayMap, toISO, weekdayIndex } from "./holidays.ts";
+import { daysBetween, daysInMonth, holidayMap, toISO, weekdayIndex } from "./holidays.ts";
 
 export const BONUS_PERCENTAGE = 0.05;
 export const THRESHOLD_FACTOR = 2.5; // per maand, x bruto maandsalaris
@@ -13,6 +13,11 @@ export interface Settings {
   /** Ma t/m vr: werk je op die dag? */
   workdays: boolean[];
   holidayOn: Record<string, boolean>;
+  /**
+   * Om de week vrij op vrijdag: een (willekeurige) vrije vrijdag als ISO-datum,
+   * bijv. "2026-11-20". Elke 14 dagen daarvoor/daarna is ook vrij. null = elke vrijdag werken.
+   */
+  alternateFriday: string | null;
 }
 
 export interface MonthStats {
@@ -44,9 +49,29 @@ export function workdayCount(s: Settings): number {
   return s.workdays.filter(Boolean).length;
 }
 
-export function hoursPerDay(s: Settings): number {
+/** Is de referentiedatum een geldige vrijdag? */
+export function validAlternateFriday(ref: string | null): ref is string {
+  return !!ref && /^\d{4}-\d{2}-\d{2}$/.test(ref) && weekdayIndex(ref) === 4;
+}
+
+/** Gemiddeld aantal werkdagen per week (een om-de-week-vrijdag telt voor een halve). */
+export function averageDaysPerWeek(s: Settings): number {
   const n = workdayCount(s);
-  return n === 0 ? 0 : s.hoursPerWeek / n;
+  const alt = s.workdays[4] && validAlternateFriday(s.alternateFriday);
+  return alt ? n - 0.5 : n;
+}
+
+export function hoursPerDay(s: Settings): number {
+  const n = averageDaysPerWeek(s);
+  return n <= 0 ? 0 : s.hoursPerWeek / n;
+}
+
+/** Valt deze datum op een vrije vrijdag in de om-de-week-regeling? */
+export function isAlternateOffDay(iso: string, s: Settings): boolean {
+  if (weekdayIndex(iso) !== 4 || !s.workdays[4] || !validAlternateFriday(s.alternateFriday)) {
+    return false;
+  }
+  return daysBetween(s.alternateFriday, iso) % 14 === 0;
 }
 
 /** Salaris dat voor de drempel telt: fulltime-salaris naar rato van de uren. */
@@ -69,6 +94,7 @@ export function monthStats(
     const iso = toISO(year, month, d);
     const wi = weekdayIndex(iso);
     if (wi > 4 || !s.workdays[wi]) continue;
+    if (isAlternateOffDay(iso, s)) continue;
     if (hol.has(iso)) {
       holidays++;
     } else if (leave.has(iso)) {
