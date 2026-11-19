@@ -14,6 +14,28 @@
   --color-bad-tint: #fde4e1;
 }
 
+:root {
+  --hatch-a: #fff3cf;
+  --hatch-b: #f5dc96;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: #0e0f1f;
+  --color-surface: #181a36;
+  --color-ink: #eceefb;
+  --color-muted: #a6abcb;
+  --color-line: #2e3153;
+  --color-accent: #5a5af0;
+  --color-accent-soft: #28295e;
+  --color-ok: #3ccf8e;
+  --color-ok-tint: #10382a;
+  --color-bad: #ff8077;
+  --color-bad-tint: #471a1c;
+  --hatch-a: #3a3011;
+  --hatch-b: #4d3f18;
+}
+
 body {
   background: var(--color-paper);
   color: var(--color-ink);
@@ -32,7 +54,7 @@ body {
 
 /* Gearceerd vlak = niet declarabel (feestdag) */
 .hatch {
-  background: repeating-linear-gradient(135deg, #fff3cf 0 6px, #f5dc96 6px 8px);
+  background: repeating-linear-gradient(135deg, var(--hatch-a) 0 6px, var(--hatch-b) 6px 8px);
 }
 
 :focus-visible {

@@ -313,9 +313,12 @@ export default function BonusApp() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
-      <header className="flex items-baseline justify-between gap-4">
-        <h1 className="font-display text-xl font-bold sm:text-2xl">Bonus-checker</h1>
-        <p className="hidden text-sm text-muted sm:block">Haal ik mijn drempel als ik verlof neem?</p>
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-baseline gap-4">
+          <h1 className="font-display text-xl font-bold sm:text-2xl">Bonus-checker</h1>
+          <p className="hidden text-sm text-muted md:block">Haal ik mijn drempel als ik verlof neem?</p>
+        </div>
+        <ThemeToggle />
       </header>
 
       {/* Uitkomst: dezelfde opbouw en hoogte, ook als er nog gegevens ontbreken */}
@@ -328,13 +331,13 @@ export default function BonusApp() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => go(-1)} aria-label="Vorige maand"
-              className="size-11 rounded-full border border-ink/30 bg-white/70 text-lg hover:bg-white">←</button>
+              className="size-11 rounded-full border border-ink/30 bg-surface/70 text-lg hover:bg-surface">←</button>
             <h2 id="uitkomst" className="font-display min-w-44 text-center text-3xl font-bold capitalize sm:text-5xl">
               {periodTitle}
               <span className="sr-only"> {year}</span>
             </h2>
             <button type="button" onClick={() => go(1)} aria-label="Volgende maand"
-              className="size-11 rounded-full border border-ink/30 bg-white/70 text-lg hover:bg-white">→</button>
+              className="size-11 rounded-full border border-ink/30 bg-surface/70 text-lg hover:bg-surface">→</button>
           </div>
           <p className="text-sm text-ink/80">{year}</p>
         </div>
@@ -352,7 +355,7 @@ export default function BonusApp() {
         {ready ? (
           <Gauge hours={ev.hours} needed={ev.neededHours} ok={ev.achieved} />
         ) : (
-          <div className="mt-8 h-5 rounded-full bg-white/80" aria-hidden="true" />
+          <div className="mt-8 h-5 rounded-full bg-surface/80" aria-hidden="true" />
         )}
 
         <p className="mt-10 min-h-14 text-base sm:min-h-8 sm:text-lg">
@@ -514,7 +517,7 @@ function Gauge({ hours, needed, ok }: { hours: number; needed: number; ok: boole
   return (
     <div className="relative mt-8" role="img"
       aria-label={`${dec(hours)} declarabele uren, drempel ${dec(needed)} uur`}>
-      <div className="h-5 overflow-hidden rounded-full bg-white/80">
+      <div className="h-5 overflow-hidden rounded-full bg-surface/80">
         <div className={`h-full rounded-full transition-[width] duration-500 ${ok ? "bg-ok" : "bg-bad"}`}
           style={{ width: `${pct}%` }} />
       </div>
@@ -524,5 +527,35 @@ function Gauge({ hours, needed, ok }: { hours: number; needed: number; ok: boole
         drempel {dec(needed)} u
       </span>
     </div>
+  );
+}
+
+function ThemeToggle() {
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(document.documentElement.dataset.theme === "dark");
+  }, []);
+
+  const toggle = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.dataset.theme = next ? "dark" : "light";
+    try {
+      localStorage.setItem("bonus-theme", next ? "dark" : "light");
+    } catch {
+      /* negeren */
+    }
+  };
+
+  return (
+    <button type="button" role="switch" aria-checked={dark} onClick={toggle}
+      className="flex items-center gap-2 rounded-full border border-line bg-surface py-1.5 pl-3 pr-2 text-sm font-medium hover:border-ink">
+      Donkere modus
+      <span aria-hidden="true"
+        className={`relative inline-block h-6 w-11 rounded-full transition-colors duration-200 ${dark ? "bg-accent" : "bg-line"}`}>
+        <span className={`absolute left-0.5 top-0.5 size-5 rounded-full bg-white transition-transform duration-200 ${dark ? "translate-x-5" : ""}`} />
+      </span>
+    </button>
   );
 }

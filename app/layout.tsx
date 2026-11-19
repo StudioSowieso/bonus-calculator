@@ -13,6 +13,8 @@ const body = Instrument_Sans({
   display: "swap",
 });
 
+const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("bonus-theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.theme=t}catch(e){}})();`;
+
 export const metadata: Metadata = {
   title: "Bonus-checker: haal ik mijn drempel met verlof?",
   description:
@@ -21,7 +23,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="nl" className={`${display.variable} ${body.variable}`}>
+    <html lang="nl" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Thema instellen voor de eerste weergave, zodat er geen lichte flits is in donkere modus */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   );
