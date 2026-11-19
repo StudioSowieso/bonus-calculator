@@ -1,39 +1,47 @@
 @import "tailwindcss";
 
 @theme {
-  --color-paper: #f3f5f9;
+  --color-paper: #f4f0e8;
   --color-surface: #ffffff;
-  --color-ink: #14143a;
-  --color-muted: #565b78;
-  --color-line: #d5d9e6;
-  --color-accent: #3434e8;
-  --color-accent-soft: #e4e4fd;
-  --color-ok: #0a8553;
-  --color-ok-tint: #d9f3e6;
-  --color-bad: #c42f29;
-  --color-bad-tint: #fde4e1;
+  --color-cell: #f4f0e8;
+  --color-ink: #1f3a34;
+  --color-muted: #55645f;
+  --color-line: #dad3c2;
+  --color-forest: #1f3a34;
+  --color-forest-line: #3b5a52;
+  --color-forest-track: #33564d;
+  --color-forest-text: #d6e3dd;
+  --color-mint: #6ef58f;
+  --color-salmon: #ff9b8f;
+  --color-ok: #1f6b4f;
+  --color-bad: #b23e2c;
+  --color-focus: #1f3a34;
+  --color-cell-hover: #eae4d6;
 }
 
 :root {
-  --hatch-a: #fff3cf;
-  --hatch-b: #f5dc96;
+  --hatch-a: #f6e7b4;
+  --hatch-b: #ebd58e;
 }
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  --color-paper: #0e0f1f;
-  --color-surface: #181a36;
-  --color-ink: #eceefb;
-  --color-muted: #a6abcb;
-  --color-line: #2e3153;
-  --color-accent: #5a5af0;
-  --color-accent-soft: #28295e;
-  --color-ok: #3ccf8e;
-  --color-ok-tint: #10382a;
-  --color-bad: #ff8077;
-  --color-bad-tint: #471a1c;
-  --hatch-a: #3a3011;
-  --hatch-b: #4d3f18;
+  --color-paper: #0e1815;
+  --color-surface: #16241f;
+  --color-cell: #1e302a;
+  --color-ink: #eaf1ed;
+  --color-muted: #a3b5ae;
+  --color-line: #2d423b;
+  --color-forest: #234a3f;
+  --color-forest-line: #3d6a5c;
+  --color-forest-track: #2f5b4e;
+  --color-forest-text: #d6e3dd;
+  --color-ok: #4bd39a;
+  --color-bad: #ff8f7f;
+  --color-focus: #6ef58f;
+  --color-cell-hover: #2a433b;
+  --hatch-a: #3f3615;
+  --hatch-b: #52461d;
 }
 
 body {
@@ -41,11 +49,6 @@ body {
   color: var(--color-ink);
   font-family: var(--nf-body), system-ui, -apple-system, "Segoe UI", sans-serif;
   line-height: 1.5;
-}
-
-.font-display {
-  font-family: var(--nf-display), system-ui, -apple-system, "Segoe UI", sans-serif;
-  letter-spacing: -0.02em;
 }
 
 .tnum {
@@ -58,7 +61,7 @@ body {
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-accent);
+  outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
 

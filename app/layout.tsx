@@ -1,13 +1,8 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
 
-const display = Bricolage_Grotesque({
-  subsets: ["latin"],
-  variable: "--nf-display",
-  display: "swap",
-});
-const body = Instrument_Sans({
+const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--nf-body",
   display: "swap",
@@ -23,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="nl" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
+    <html lang="nl" className={dmSans.variable} suppressHydrationWarning>
       <head>
         {/* Thema instellen voor de eerste weergave, zodat er geen lichte flits is in donkere modus */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

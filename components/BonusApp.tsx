@@ -153,6 +153,9 @@ export default function BonusApp() {
   };
 
   const current = evalFor(month);
+  const periodMonths = current.combined ? [current.from, current.from + 1] : [month];
+  const periodLeave = periodMonths.reduce((n, m) => n + statsFor(m).leaveDays, 0);
+  const periodHolidays = periodMonths.reduce((n, m) => n + statsFor(m).holidays, 0);
   const yearOverview = useMemo(
     () => Array.from({ length: 12 }, (_, i) => evalFor(i + 1)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,14 +200,10 @@ export default function BonusApp() {
     ...Array.from({ length: dim }, (_, i) => i + 1),
   ];
 
-  if (!loaded) {
-    return <main className="mx-auto max-w-5xl p-6">Laden…</main>;
-  }
 
-  const input =
-    "mt-1 h-11 w-full rounded-md border border-line bg-surface px-3 text-base focus:border-accent";
-  const ghostBtn =
-    "rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium hover:border-ink";
+  if (!loaded) {
+    return <main className="mx-auto max-w-[1200px] p-6">Laden…</main>;
+  }
 
   const missing: string[] = [];
   if (settings.fulltimeSalary <= 0) missing.push("salaris");
@@ -213,291 +212,310 @@ export default function BonusApp() {
   if (workdayCount(settings) === 0) missing.push("minstens één werkdag");
   if (altInvalid) missing.push("een geldige vrije vrijdag");
 
+  const ev = current.ev;
   const periodTitle = current.combined
     ? `${monthName(year, current.from)} en ${monthName(year, current.from + 1)}`
     : monthName(year, month);
-  const ev = current.ev;
-  const st = statsFor(month);
 
-  const form = (
-    <section aria-labelledby="gegevens" className="space-y-5">
-      <h2 id="gegevens" className="font-display text-xl font-semibold">
-        Jouw gegevens
-      </h2>
-      <div>
-        <label htmlFor="salary" className="text-sm font-medium">Bruto maandsalaris (fulltime)</label>
-        <input id="salary" inputMode="decimal" className={`${input} tnum`} value={salary}
-          onChange={(e) => setSalary(e.target.value)} placeholder="bijv. 4000" />
-        <p className="mt-1 text-xs text-muted">In euro. Wordt omgerekend naar jouw uren (uren ÷ 40).</p>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label htmlFor="hours" className="text-sm font-medium">Uren per week</label>
-          <input id="hours" inputMode="decimal" className={`${input} tnum`} value={hours}
-            onChange={(e) => setHours(e.target.value)} placeholder="bijv. 36" />
-        </div>
-        <div>
-          <label htmlFor="rate" className="text-sm font-medium">Uurtarief</label>
-          <input id="rate" inputMode="decimal" className={`${input} tnum`} value={rate}
-            onChange={(e) => setRate(e.target.value)} placeholder="bijv. 95" />
-        </div>
-      </div>
-      <p className="-mt-3 text-xs text-muted">
-        Uurtarief in euro, excl. btw: wat je werkgever van de klant ontvangt.
-      </p>
-
-      <fieldset>
-        <legend className="text-sm font-medium">Op welke dagen werk je?</legend>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {WORKDAY_LABELS.map((label, i) => (
-            <label key={label}
-              className="flex h-11 min-w-12 cursor-pointer items-center justify-center rounded-md border border-line bg-surface px-3 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent-soft has-[:checked]:font-semibold has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-accent">
-              <input type="checkbox" className="sr-only" checked={workdays[i]}
-                onChange={() => setWorkdays((w) => w.map((v, j) => (j === i ? !v : v)))} />
-              {label.slice(0, 2)}
-              <span className="sr-only">{label.slice(2)}</span>
-            </label>
-          ))}
-        </div>
-        {workdays[4] && (
-          <div className="mt-3">
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input type="checkbox" className="size-4 accent-accent" checked={altFriday}
-                onChange={() => setAltFriday((v) => !v)} />
-              Ik ben om de week op vrijdag vrij
-            </label>
-            {altFriday && (
-              <div className="mt-2">
-                <label htmlFor="altref" className="text-sm font-medium">Een vrije vrijdag</label>
-                <input id="altref" type="date" className={input} value={altFridayRef}
-                  onChange={(e) => setAltFridayRef(e.target.value)}
-                  aria-describedby="altref-hint" aria-invalid={altInvalid || undefined} />
-                <p id="altref-hint" className={`mt-1 text-xs ${altInvalid ? "text-bad" : "text-muted"}`}>
-                  {altInvalid
-                    ? "Kies een datum die op een vrijdag valt. Een vrije vrijdag uit het verleden of de toekomst mag."
-                    : "Elke twee weken daarvoor en daarna ben je ook vrij."}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-        {hpd > 0 && (
-          <p className="mt-3 text-sm text-muted">
-            Dat zijn {dec(hpd)} declarabele uur per werkdag
-            {altActive && !altInvalid ? " (gemiddeld 4,5 werkdag per week)" : ""}.
-          </p>
-        )}
-      </fieldset>
-
-      <details className="rounded-md border border-line bg-surface p-3">
-        <summary className="cursor-pointer text-sm font-medium">Feestdagen aanpassen</summary>
-        <p className="mt-2 text-xs text-muted">
-          Aangevinkte feestdagen zijn niet declarabel en kosten geen verlofdag.
-        </p>
-        <div className="mt-2 space-y-1.5">
-          {holidayList(year).map((h) => (
-            <label key={h.id} className="flex items-start gap-2 text-sm">
-              <input type="checkbox" className="mt-1 size-4 accent-accent"
-                checked={holidayOn[h.id] ?? h.defaultOn}
-                onChange={() => setHolidayOn((o) => ({ ...o, [h.id]: !(o[h.id] ?? h.defaultOn) }))} />
-              <span>
-                {h.name} <span className="text-muted">{longDate(h.date)}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </details>
-      <p className="text-xs text-muted">Je gegevens blijven in je eigen browser.</p>
-    </section>
-  );
+  const input =
+    "mt-1.5 block h-12 w-full rounded-xl border border-line bg-surface px-3.5 text-base text-ink";
+  const lineBtn =
+    "inline-flex min-h-11 items-center justify-center rounded-[10px] border border-line bg-surface px-4 text-sm font-medium hover:border-ink";
+  const navBtn =
+    "size-11 shrink-0 rounded-full border border-line bg-surface text-lg hover:border-ink";
+  const card = "rounded-3xl bg-surface p-5 shadow-[0_6px_20px_rgba(31,58,52,0.07)] sm:p-6";
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
-      <header className="flex items-center justify-between gap-4">
-        <div className="flex items-baseline gap-4">
-          <h1 className="font-display text-xl font-bold sm:text-2xl">Bonus-checker</h1>
-          <p className="hidden text-sm text-muted md:block">Haal ik mijn drempel als ik verlof neem?</p>
+    <main className="mx-auto max-w-[1200px] px-4 pb-16 sm:px-8">
+      <header className="flex min-h-[72px] flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <h1 className="flex items-center gap-2.5 text-xl font-bold tracking-tight">
+            <span aria-hidden="true" className="inline-flex size-[34px] items-center justify-center rounded-[10px] bg-forest text-mint">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+            </span>
+            Bonus-checker
+          </h1>
+          <p className="text-sm text-muted">Haal ik mijn drempel als ik verlof neem?</p>
         </div>
         <ThemeToggle />
       </header>
 
-      {/* Uitkomst: dezelfde opbouw en hoogte, ook als er nog gegevens ontbreken */}
-      <section
-        aria-labelledby="uitkomst"
-        className={`mt-5 rounded-3xl p-5 transition-colors duration-500 sm:p-8 ${
-          !ready ? "bg-accent-soft" : ev.achieved ? "bg-ok-tint" : "bg-bad-tint"
-        }`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => go(-1)} aria-label="Vorige maand"
-              className="size-11 rounded-full border border-ink/30 bg-surface/70 text-lg hover:bg-surface">←</button>
-            <h2 id="uitkomst" className="font-display min-w-44 text-center text-3xl font-bold capitalize sm:text-5xl">
-              {periodTitle}
-              <span className="sr-only"> {year}</span>
-            </h2>
-            <button type="button" onClick={() => go(1)} aria-label="Volgende maand"
-              className="size-11 rounded-full border border-ink/30 bg-surface/70 text-lg hover:bg-surface">→</button>
-          </div>
-          <p className="text-sm text-ink/80">{year}</p>
-        </div>
-
-        <div role="status" aria-live="polite" className="mt-6 flex flex-wrap items-end justify-between gap-x-8 gap-y-2">
-          <p className={`font-display text-2xl font-semibold sm:text-3xl ${!ready ? "text-ink" : ev.achieved ? "text-ok" : "text-bad"}`}>
-            {!ready ? "Vul je gegevens in" : ev.achieved ? "✓ Je haalt de drempel" : "✗ Je haalt de drempel niet"}
-          </p>
-          <p className="font-display tnum text-4xl font-bold sm:text-6xl">
-            {ready ? eur(ev.bonus) : "€ –"}
-            <span className="ml-2 text-base font-medium text-ink/80">bruto bonus</span>
-          </p>
-        </div>
-
-        {ready ? (
-          <Gauge hours={ev.hours} needed={ev.neededHours} ok={ev.achieved} />
-        ) : (
-          <div className="mt-8 h-5 rounded-full bg-surface/80" aria-hidden="true" />
-        )}
-
-        <p className="mt-10 min-h-14 text-base sm:min-h-8 sm:text-lg">
-          {!ready
-            ? `Nog nodig: ${missing.join(", ")}.`
-            : ev.achieved
-              ? ev.extraLeaveDays > 0
-                ? `Je kunt nog ${ev.extraLeaveDays} extra verlofdag${ev.extraLeaveDays === 1 ? "" : "en"} nemen en je bonus houden.`
-                : "Je zit precies op de grens: nog één verlofdag en je mist de drempel."
-              : `Je komt ${dec(ev.shortHours)} uur tekort. Haal ${ev.daysNeeded} verlofdag${ev.daysNeeded === 1 ? "" : "en"} uit je planning of werk extra om de drempel te halen.`}
-        </p>
-
-        <dl className="tnum mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-ink/20 pt-4 text-sm sm:grid-cols-4">
-          <div><dt className="text-muted">Declarabele uren</dt><dd className="text-lg font-semibold">{ready ? `${dec(ev.hours)} u` : "–"}</dd></div>
-          <div><dt className="text-muted">Nodig voor de drempel</dt><dd className="text-lg font-semibold">{ready ? `meer dan ${dec(ev.neededHours)} u` : "–"}</dd></div>
-          <div><dt className="text-muted">Omzet</dt><dd className="text-lg font-semibold">{ready ? eur(ev.revenue) : "–"}</dd></div>
-          <div><dt className="text-muted">Drempel</dt><dd className="text-lg font-semibold">{ready ? eur(ev.threshold) : "–"}</dd></div>
-        </dl>
-
-        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          <span>{st.leaveDays} verlofdag{st.leaveDays === 1 ? "" : "en"} · {st.holidays} feestdag{st.holidays === 1 ? "" : "en"} op een werkdag</span>
-          {current.combined ? (
-            <button type="button" className={ghostBtn} onClick={() =>
-              setPairStart((p) => { const n = { ...p }; delete n[yearKey]; return n; })}>
-              Terug naar losse maanden
-            </button>
-          ) : (
-            <button type="button" disabled={!ready} className={`${ghostBtn} disabled:cursor-not-allowed disabled:opacity-50`} onClick={() => {
-              const start = month === 12 ? 11 : month; // binnen hetzelfde jaar
-              setPairStart((p) => ({ ...p, [yearKey]: start }));
-            }}>
-              {pair !== undefined ? "Verplaats 2-maandsregeling hierheen" : "Gebruik 2-maandsregeling (1× per jaar)"}
-            </button>
-          )}
-        </div>
-      </section>
-
-      <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_20rem]">
-        <section aria-labelledby="kalender" className="min-w-0 lg:order-1">
-            <div className="flex items-end justify-between gap-3">
-              <h2 id="kalender" className="font-display text-xl font-semibold">
-                Verlof plannen in <span className="capitalize">{monthName(year, month)}</span>
-              </h2>
-              <button type="button" onClick={clearMonth} className={ghostBtn}>Verlof wissen</button>
-            </div>
-            <p className="mt-1 text-sm text-muted">Klik op een werkdag om verlof aan of uit te zetten.</p>
-
-            <div className="mt-3 overflow-hidden rounded-lg border border-line">
-              <div className="grid grid-cols-7 gap-px bg-line">
-                {DAY_LABELS.map((d) => (
-                  <div key={d} className="bg-paper py-2 text-center text-sm font-medium text-muted">{d}</div>
-                ))}
-                {cells.map((day, i) => {
-                  if (day === null) return <div key={`e${i}`} className="bg-paper" />;
-                  const iso = toISO(year, month, day);
-                  const wi = weekdayIndex(iso);
-                  const holName = hol.get(iso);
-                  const isWork = wi <= 4 && settings.workdays[wi];
-                  const offFriday = isWork && isAlternateOffDay(iso, settings);
-                  const onLeave = leave.has(iso);
-                  const cell = "flex h-16 flex-col justify-between p-1.5 text-left sm:h-24 sm:p-2";
-                  if (!isWork || offFriday) {
-                    return (
-                      <div key={iso} className={`${cell} bg-paper text-muted`}
-                        aria-label={offFriday ? `${longDate(iso)}: vrij (om de week)` : undefined}>
-                        <span className="text-sm">{day}</span>
-                        {offFriday && <span className="text-xs">vrij</span>}
-                        {holName && !offFriday && <span className="text-[11px] leading-tight">{holName}</span>}
-                      </div>
-                    );
-                  }
-                  if (holName) {
-                    return (
-                      <div key={iso} className={`${cell} hatch text-ink`}
-                        aria-label={`${longDate(iso)}: ${holName}, niet declarabel`}>
-                        <span className="text-sm font-semibold">{day}</span>
-                        <span className="text-[11px] font-medium leading-tight">{holName}</span>
-                      </div>
-                    );
-                  }
-                  return (
-                    <button key={iso} type="button" aria-pressed={onLeave} onClick={() => toggleLeave(iso)}
-                      aria-label={`${longDate(iso)}, ${onLeave ? "verlof" : "werkdag"}`}
-                      className={`${cell} cursor-pointer transition-colors duration-150 ${
-                        onLeave ? "bg-accent text-white" : "bg-surface hover:bg-accent-soft"
-                      }`}>
-                      <span className="text-sm font-semibold">{day}</span>
-                      <span className={`tnum text-xs ${onLeave ? "text-white" : "text-muted"}`}>
-                        {onLeave ? "verlof" : hpd > 0 ? `${dec(hpd)} u` : ""}
-                      </span>
-                    </button>
-                  );
-                })}
+      <div className="mt-2 flex flex-col gap-6 lg:flex-row lg:items-start">
+        {/* Linkerkolom: kalender + jaaroverzicht */}
+        <div className="contents lg:flex lg:min-w-0 lg:flex-1 lg:flex-col lg:gap-6">
+          <section aria-labelledby="kalender" className={`${card} order-2`}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => go(-1)} aria-label="Vorige maand" className={navBtn}>←</button>
+                <h2 id="kalender" aria-live="polite" className="min-w-40 text-center text-2xl font-semibold capitalize tracking-tight sm:min-w-52 sm:text-[32px]">
+                  {monthName(year, month)} {year}
+                </h2>
+                <button type="button" onClick={() => go(1)} aria-label="Volgende maand" className={navBtn}>→</button>
               </div>
+              <button type="button" onClick={clearMonth} className={lineBtn}>Verlof wissen</button>
             </div>
-            <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
-              <li className="flex items-center gap-1.5"><span className="inline-block size-3 rounded-sm border border-line bg-surface" />werkdag</li>
-              <li className="flex items-center gap-1.5"><span className="inline-block size-3 rounded-sm bg-accent" />verlof</li>
-              <li className="flex items-center gap-1.5"><span className="hatch inline-block size-3 rounded-sm" />feestdag, niet declarabel</li>
+            <p className="mb-5 mt-3 text-sm text-muted">Klik op een werkdag om verlof aan of uit te zetten.</p>
+
+            <div className="grid grid-cols-7 gap-1.5">
+              {DAY_LABELS.map((d) => (
+                <div key={d} className="pb-1 text-center text-sm font-medium text-muted">{d}</div>
+              ))}
+              {cells.map((day, i) => {
+                if (day === null) return <div key={`e${i}`} />;
+                const iso = toISO(year, month, day);
+                const wi = weekdayIndex(iso);
+                const holName = hol.get(iso);
+                const isWork = wi <= 4 && settings.workdays[wi];
+                const offFriday = isWork && isAlternateOffDay(iso, settings);
+                const onLeave = leave.has(iso);
+                const cell =
+                  "flex h-16 flex-col justify-between rounded-[14px] p-2 text-left sm:h-[84px] sm:px-3 sm:py-2.5";
+                if (!isWork || offFriday) {
+                  return (
+                    <div key={iso}
+                      aria-label={offFriday ? `${longDate(iso)}: vrij (om de week)` : undefined}
+                      className={`${cell} text-muted ${offFriday ? "border border-dashed border-line" : ""}`}>
+                      <span className="text-[15px]">{day}</span>
+                      {offFriday ? (
+                        <span className="text-xs">vrij</span>
+                      ) : holName ? (
+                        <span className="text-[11px] leading-tight">{holName}</span>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
+                  );
+                }
+                if (holName) {
+                  return (
+                    <div key={iso} className={`${cell} hatch text-ink`}
+                      aria-label={`${longDate(iso)}: ${holName}, niet declarabel`}>
+                      <span className="text-[15px] font-semibold">{day}</span>
+                      <span className="text-[11px] font-medium leading-tight">{holName}</span>
+                    </div>
+                  );
+                }
+                return (
+                  <button key={iso} type="button" aria-pressed={onLeave} onClick={() => toggleLeave(iso)}
+                    aria-label={`${longDate(iso)}, ${onLeave ? "verlof" : "werkdag"}`}
+                    className={`${cell} cursor-pointer transition-colors duration-150 ${
+                      onLeave ? "bg-forest text-white" : "bg-cell text-ink hover:bg-cell-hover"
+                    }`}>
+                    <span className="text-[15px] font-semibold">{day}</span>
+                    <span className={`tnum text-xs ${onLeave ? "text-mint" : "text-muted"}`}>
+                      {onLeave ? "verlof" : hpd > 0 ? `${dec(hpd)} u` : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
+              <li className="flex items-center gap-2"><span aria-hidden="true" className="inline-block size-3.5 rounded bg-cell ring-1 ring-line" />werkdag</li>
+              <li className="flex items-center gap-2"><span aria-hidden="true" className="inline-block size-3.5 rounded bg-forest" />verlof</li>
+              <li className="flex items-center gap-2"><span aria-hidden="true" className="hatch inline-block size-3.5 rounded" />feestdag, niet declarabel</li>
+              <li className="flex items-center gap-2"><span aria-hidden="true" className="inline-block size-3.5 rounded border border-dashed border-line" />vrij</li>
             </ul>
           </section>
 
-        <div className="lg:order-2 lg:border-l lg:border-line lg:pl-8">
-          {form}
+          <section aria-labelledby="jaar" className={`${card} order-4`}>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 id="jaar" className="text-2xl font-semibold tracking-tight">Jaaroverzicht {year}</h2>
+              <p className="text-[15px] text-muted">
+                Verwachte bonus: <strong className="tnum text-ink">{eur(yearBonus)}</strong> bruto
+              </p>
+            </div>
+            <p className="mt-1.5 text-[13px] text-muted">Elke balk toont je omzet ten opzichte van de drempel (de streep).</p>
+            <ul className="mt-4 grid grid-cols-6 gap-1 sm:grid-cols-12">
+              {yearOverview.map((r, i) => {
+                const m = i + 1;
+                const ratio = r.ev.threshold > 0 ? r.ev.revenue / r.ev.threshold : 0;
+                const h = Math.min(ratio / 1.6, 1) * 100;
+                return (
+                  <li key={m}>
+                    <button type="button" onClick={() => setView({ year, month: m })}
+                      aria-current={m === month ? "true" : undefined}
+                      className={`w-full rounded-[14px] px-1 py-2 text-center hover:bg-cell ${m === month ? "bg-cell" : ""}`}>
+                      <span className="relative block h-[130px] border-b border-line">
+                        <span aria-hidden="true" className="absolute inset-x-0 border-t-2 border-dashed border-muted/60" style={{ bottom: `${100 / 1.6}%` }} />
+                        <span aria-hidden="true"
+                          className={`absolute inset-x-1.5 bottom-0 rounded-t-md transition-[height] duration-500 ${!ready ? "bg-line" : r.ev.achieved ? "bg-ok" : "bg-bad"}`}
+                          style={{ height: `${h}%` }} />
+                      </span>
+                      <span className="mt-2 block text-sm font-semibold">
+                        {new Date(Date.UTC(year, i, 1)).toLocaleDateString("nl-NL", { month: "short", timeZone: "UTC" })}
+                      </span>
+                      <span className={`block text-xs font-medium ${!ready ? "text-muted" : r.ev.achieved ? "text-ok" : "text-bad"}`}>
+                        {!ready ? "–" : r.ev.achieved ? "✓ gehaald" : "✗ niet"}
+                      </span>
+                      {r.combined && <span className="block text-[11px] text-muted">2 mnd</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        </div>
+
+        {/* Rechterkolom: uitkomst + gegevens */}
+        <div className="contents lg:flex lg:w-[400px] lg:flex-none lg:flex-col lg:gap-6">
+          <section aria-labelledby="uitkomst"
+            className="relative order-1 overflow-hidden rounded-3xl bg-forest p-6 text-white shadow-[0_18px_40px_rgba(31,58,52,0.25)] sm:p-7">
+            <svg aria-hidden="true" viewBox="0 0 400 160" fill="none" className="pointer-events-none absolute -right-8 -top-5 w-[400px]">
+              <path d="M20 30C90 0 140 100 210 80S320 0 430 60" stroke="var(--color-forest-line)" strokeOpacity="0.55" strokeWidth="7" strokeLinecap="round" />
+              <path d="M50 90C120 60 170 160 240 140S350 60 460 120" stroke="var(--color-forest-line)" strokeOpacity="0.55" strokeWidth="7" strokeLinecap="round" />
+            </svg>
+            <div className="relative">
+              <h2 id="uitkomst" className="text-xl font-medium text-forest-text">Uitkomst {periodTitle}</h2>
+              <p role="status" aria-live="polite"
+                className={`mt-3.5 inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[15px] font-semibold ${
+                  !ready ? "bg-white/15 text-white" : ev.achieved ? "bg-mint text-[#1f3a34]" : "bg-salmon text-[#1f3a34]"
+                }`}>
+                {!ready ? "Vul je gegevens in" : ev.achieved ? "✓ Je haalt de drempel" : "✗ Je haalt de drempel niet"}
+              </p>
+
+              <Gauge hours={ev.hours} needed={ev.neededHours} ok={ev.achieved} ready={ready} bonus={ev.bonus} />
+              <p className="mt-1 text-center text-xs text-forest-text">
+                {ready ? `De streep is je drempel: ${dec(ev.neededHours)} u.` : " "}
+              </p>
+
+              <p className="mb-4 mt-3 min-h-[3.5rem] text-base leading-snug">
+                {!ready
+                  ? `Nog nodig: ${missing.join(", ")}.`
+                  : ev.achieved
+                    ? ev.extraLeaveDays > 0
+                      ? <>Je kunt nog <strong className="text-mint">{ev.extraLeaveDays} extra verlofdag{ev.extraLeaveDays === 1 ? "" : "en"}</strong> nemen en je bonus houden.</>
+                      : "Je zit precies op de grens: nog één verlofdag en je mist de drempel."
+                    : `Je komt ${dec(ev.shortHours)} uur tekort. Haal ${ev.daysNeeded} verlofdag${ev.daysNeeded === 1 ? "" : "en"} uit je planning of werk extra om de drempel te halen.`}
+              </p>
+
+              <dl className="tnum">
+                {[
+                  ["Declarabele uren", ready ? `${dec(ev.hours)} u` : "–"],
+                  ["Nodig voor de drempel", ready ? `meer dan ${dec(ev.neededHours)} u` : "–"],
+                  ["Omzet", ready ? eur(ev.revenue) : "–"],
+                  ["Drempel", ready ? eur(ev.threshold) : "–"],
+                  ["Verlofdagen", String(periodLeave)],
+                  ["Feestdagen op een werkdag", String(periodHolidays)],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-4 border-t border-forest-line py-2.5 text-[15px]">
+                    <dt className="text-forest-text">{k}</dt>
+                    <dd className="text-right font-semibold">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              <div className="mt-4">
+                {current.combined ? (
+                  <button type="button" className={mintBtn}
+                    onClick={() => setPairStart((p) => { const n = { ...p }; delete n[yearKey]; return n; })}>
+                    Terug naar losse maanden
+                  </button>
+                ) : (
+                  <button type="button" disabled={!ready} className={`${mintBtn} disabled:cursor-not-allowed disabled:opacity-50`}
+                    onClick={() => {
+                      const start = month === 12 ? 11 : month; // binnen hetzelfde jaar
+                      setPairStart((p) => ({ ...p, [yearKey]: start }));
+                    }}>
+                    {pair !== undefined ? "Verplaats 2-maandsregeling hierheen" : "Gebruik 2-maandsregeling (1× per jaar)"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section aria-labelledby="gegevens" className={`${card} order-3`}>
+            <h2 id="gegevens" className="text-2xl font-semibold tracking-tight">Jouw gegevens</h2>
+            <div className="mt-5 flex flex-col gap-[18px]">
+              <div>
+                <label htmlFor="salary" className="text-[15px] font-medium">Bruto maandsalaris (fulltime)</label>
+                <input id="salary" inputMode="decimal" className={`${input} tnum`} value={salary}
+                  onChange={(e) => setSalary(e.target.value)} placeholder="bijv. 4000" />
+                <p className="mt-1.5 text-[13px] text-muted">In euro. Wordt omgerekend naar jouw uren (uren ÷ 40).</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="hours" className="text-[15px] font-medium">Uren per week</label>
+                  <input id="hours" inputMode="decimal" className={`${input} tnum`} value={hours}
+                    onChange={(e) => setHours(e.target.value)} placeholder="bijv. 36" />
+                </div>
+                <div>
+                  <label htmlFor="rate" className="text-[15px] font-medium">Uurtarief</label>
+                  <input id="rate" inputMode="decimal" className={`${input} tnum`} value={rate}
+                    onChange={(e) => setRate(e.target.value)} placeholder="bijv. 95" />
+                </div>
+              </div>
+              <p className="-mt-1.5 text-[13px] text-muted">Uurtarief in euro, excl. btw: wat je werkgever van de klant ontvangt.</p>
+
+              <fieldset>
+                <legend className="text-[15px] font-medium">Op welke dagen werk je?</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {WORKDAY_LABELS.map((label, i) => (
+                    <label key={label}
+                      className="flex h-11 min-w-12 cursor-pointer items-center justify-center rounded-xl border border-line bg-surface px-3 text-[15px] has-[:checked]:border-forest has-[:checked]:bg-forest has-[:checked]:font-semibold has-[:checked]:text-white has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-focus">
+                      <input type="checkbox" className="sr-only" checked={workdays[i]}
+                        onChange={() => setWorkdays((w) => w.map((v, j) => (j === i ? !v : v)))} />
+                      {label.slice(0, 2)}
+                      <span className="sr-only">{label.slice(2)}</span>
+                    </label>
+                  ))}
+                </div>
+                {workdays[4] && (
+                  <div className="mt-3.5">
+                    <label className="flex cursor-pointer items-center gap-2.5 text-[15px]">
+                      <input type="checkbox" className="size-[18px] accent-forest" checked={altFriday}
+                        onChange={() => setAltFriday((v) => !v)} />
+                      Ik ben om de week op vrijdag vrij
+                    </label>
+                    {altFriday && (
+                      <div className="mt-2.5">
+                        <label htmlFor="altref" className="text-[15px] font-medium">Een vrije vrijdag</label>
+                        <input id="altref" type="date" className={input} value={altFridayRef}
+                          onChange={(e) => setAltFridayRef(e.target.value)}
+                          aria-describedby="altref-hint" aria-invalid={altInvalid || undefined} />
+                        <p id="altref-hint" className={`mt-1.5 text-[13px] ${altInvalid ? "text-bad" : "text-muted"}`}>
+                          {altInvalid
+                            ? "Kies een datum die op een vrijdag valt. Een vrije vrijdag uit het verleden of de toekomst mag."
+                            : "Elke twee weken daarvoor en daarna ben je ook vrij."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {hpd > 0 && (
+                  <p className="mt-2.5 text-sm text-muted">
+                    Dat zijn {dec(hpd)} declarabele uur per werkdag
+                    {altActive && !altInvalid ? " (gemiddeld 4,5 werkdag per week)" : ""}.
+                  </p>
+                )}
+              </fieldset>
+
+              <details className="rounded-xl border border-line bg-cell px-4 py-3.5">
+                <summary className="cursor-pointer text-[15px] font-medium">Feestdagen aanpassen</summary>
+                <p className="mt-2.5 text-[13px] text-muted">
+                  Aangevinkte feestdagen zijn niet declarabel en kosten geen verlofdag.
+                </p>
+                <div className="mt-2.5 space-y-1.5">
+                  {holidayList(year).map((h) => (
+                    <label key={h.id} className="flex items-start gap-2 text-sm">
+                      <input type="checkbox" className="mt-1 size-4 accent-forest"
+                        checked={holidayOn[h.id] ?? h.defaultOn}
+                        onChange={() => setHolidayOn((o) => ({ ...o, [h.id]: !(o[h.id] ?? h.defaultOn) }))} />
+                      <span>{h.name} <span className="text-muted">{longDate(h.date)}</span></span>
+                    </label>
+                  ))}
+                </div>
+              </details>
+              <p className="flex items-center gap-2 text-[13px] text-muted">
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+                Je gegevens blijven in je eigen browser.
+              </p>
+            </div>
+          </section>
         </div>
       </div>
-      <section aria-labelledby="jaar" className="mt-12">
-          <h2 id="jaar" className="font-display text-xl font-semibold">Jaaroverzicht {year}</h2>
-          <p className="mt-1 text-sm text-muted">
-            Elke balk toont je omzet ten opzichte van de drempel (streep). Verwachte bonus dit jaar:{" "}
-            <strong className="tnum text-ink">{eur(yearBonus)}</strong> bruto.
-          </p>
-          <ul className="mt-4 grid grid-cols-6 gap-2 sm:grid-cols-12">
-            {yearOverview.map((r, i) => {
-              const m = i + 1;
-              const ratio = r.ev.threshold > 0 ? r.ev.revenue / r.ev.threshold : 0;
-              const h = Math.min(ratio / 1.6, 1) * 100;
-              return (
-                <li key={m}>
-                  <button type="button" onClick={() => setView({ year, month: m })}
-                    aria-current={m === month ? "true" : undefined}
-                    className={`w-full rounded-lg p-1.5 text-center hover:bg-surface ${m === month ? "bg-surface ring-2 ring-ink" : ""}`}>
-                    <span className="relative block h-24 border-b border-line">
-                      <span className="absolute inset-x-0 border-t border-dashed border-ink/60" style={{ bottom: `${100 / 1.6}%` }} />
-                      <span className={`absolute inset-x-1.5 bottom-0 rounded-t-sm transition-[height] duration-500 ${!ready ? "bg-line" : r.ev.achieved ? "bg-ok" : "bg-bad"}`}
-                        style={{ height: `${h}%` }} />
-                    </span>
-                    <span className="mt-1 block text-xs font-semibold capitalize">
-                      {new Date(Date.UTC(year, i, 1)).toLocaleDateString("nl-NL", { month: "short", timeZone: "UTC" })}
-                    </span>
-                    <span className={`block text-xs ${!ready ? "text-muted" : r.ev.achieved ? "text-ok" : "text-bad"}`}>
-                      {!ready ? "–" : r.ev.achieved ? "✓ gehaald" : "✗ niet"}
-                    </span>
-                    {r.combined && <span className="block text-[11px] text-muted">2 mnd</span>}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
 
-      <footer className="mt-12 max-w-prose text-xs text-muted">
+      <footer className="mt-10 max-w-[72ch] text-[13px] leading-relaxed text-muted">
         <p>
           Rekenregel: de drempel is 2,5 × je bruto maandsalaris (naar rato van je uren). Is je omzet hoger, dan is
           de bonus 5% van de hele omzet van die maand. Eén keer per jaar mag je twee opeenvolgende maanden
@@ -509,24 +527,57 @@ export default function BonusApp() {
   );
 }
 
-function Gauge({ hours, needed, ok }: { hours: number; needed: number; ok: boolean }) {
+const mintBtn =
+  "inline-flex min-h-11 items-center rounded-[10px] border border-mint bg-transparent px-4 text-sm font-medium text-mint hover:bg-mint/10 focus-visible:outline-mint";
+
+function Gauge({
+  hours,
+  needed,
+  ok,
+  ready,
+  bonus,
+}: {
+  hours: number;
+  needed: number;
+  ok: boolean;
+  ready: boolean;
+  bonus: number;
+}) {
+  const R = 116;
+  const CX = 170;
+  const CY = 150;
+  const LEN = Math.PI * R;
   const max = Math.max(hours, needed) * 1.12 || 1;
-  const pct = (hours / max) * 100;
-  const mark = (needed / max) * 100;
-  const label = Math.min(Math.max(mark, 12), 88);
+  const fill = ready ? Math.min(hours / max, 1) * LEN : 0;
+  const m = ready && needed > 0 ? Math.min(needed / max, 1) : null;
+  const arc = `M${CX - R} ${CY}A${R} ${R} 0 0 1 ${CX + R} ${CY}`;
+  let tick: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  if (m !== null) {
+    const th = Math.PI * m;
+    const c = Math.cos(th);
+    const s = Math.sin(th);
+    tick = { x1: CX - 102 * c, y1: CY - 102 * s, x2: CX - 134 * c, y2: CY - 134 * s };
+  }
+  const label = ready
+    ? `${dec(hours)} declarabele uren, drempel ${dec(needed)} uur`
+    : "Meter: vul je gegevens in";
   return (
-    <div className="relative mt-8" role="img"
-      aria-label={`${dec(hours)} declarabele uren, drempel ${dec(needed)} uur`}>
-      <div className="h-5 overflow-hidden rounded-full bg-surface/80">
-        <div className={`h-full rounded-full transition-[width] duration-500 ${ok ? "bg-ok" : "bg-bad"}`}
-          style={{ width: `${pct}%` }} />
-      </div>
-      <div className="absolute -bottom-1 -top-1 w-0.5 bg-ink" style={{ left: `${mark}%` }} />
-      <span className="tnum absolute top-7 -translate-x-1/2 whitespace-nowrap text-xs font-medium"
-        style={{ left: `${label}%` }}>
-        drempel {dec(needed)} u
-      </span>
-    </div>
+    <svg role="img" aria-label={label} viewBox="0 0 340 172" className="mt-2 block h-auto w-full">
+      <path d={arc} fill="none" stroke="var(--color-forest-track)" strokeWidth="24" strokeLinecap="round" />
+      {ready && fill > 0 && (
+        <path d={arc} fill="none" strokeWidth="24" strokeLinecap="round"
+          stroke={ok ? "var(--color-mint)" : "var(--color-salmon)"}
+          strokeDasharray={`${fill} ${LEN}`} style={{ transition: "stroke-dasharray 500ms" }} />
+      )}
+      {tick && (
+        <line x1={tick.x1} y1={tick.y1} x2={tick.x2} y2={tick.y2} stroke="#1f3a34" strokeWidth="4" strokeLinecap="round" />
+      )}
+      <text x="170" y="122" textAnchor="middle" fontSize="38" fontWeight="700" fill="#fff" letterSpacing="-1"
+        style={{ fontVariantNumeric: "tabular-nums" }}>
+        {ready ? eur(bonus) : "€ –"}
+      </text>
+      <text x="170" y="146" textAnchor="middle" fontSize="14" fill="var(--color-forest-text)">bruto bonus</text>
+    </svg>
   );
 }
 
@@ -550,11 +601,11 @@ function ThemeToggle() {
 
   return (
     <button type="button" role="switch" aria-checked={dark} onClick={toggle}
-      className="flex items-center gap-2 rounded-full border border-line bg-surface py-1.5 pl-3 pr-2 text-sm font-medium hover:border-ink">
+      className="flex min-h-10 items-center gap-2.5 rounded-full border border-line bg-surface py-1 pl-3.5 pr-2 text-sm font-medium hover:border-ink">
       Donkere modus
       <span aria-hidden="true"
-        className={`relative inline-block h-6 w-11 rounded-full transition-colors duration-200 ${dark ? "bg-accent" : "bg-line"}`}>
-        <span className={`absolute left-0.5 top-0.5 size-5 rounded-full bg-white transition-transform duration-200 ${dark ? "translate-x-5" : ""}`} />
+        className={`relative inline-block h-6 w-10 rounded-full transition-colors duration-200 ${dark ? "bg-forest" : "bg-line"}`}>
+        <span className={`absolute left-[3px] top-[3px] size-[18px] rounded-full bg-white transition-transform duration-200 ${dark ? "translate-x-4" : ""}`} />
       </span>
     </button>
   );
