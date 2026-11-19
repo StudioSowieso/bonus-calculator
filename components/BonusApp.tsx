@@ -206,6 +206,13 @@ export default function BonusApp() {
   const ghostBtn =
     "rounded-md border border-line bg-surface px-3 py-2 text-sm font-medium hover:border-ink";
 
+  const missing: string[] = [];
+  if (settings.fulltimeSalary <= 0) missing.push("salaris");
+  if (settings.hoursPerWeek <= 0) missing.push("uren per week");
+  if (settings.rate <= 0) missing.push("uurtarief");
+  if (workdayCount(settings) === 0) missing.push("minstens één werkdag");
+  if (altInvalid) missing.push("een geldige vrije vrijdag");
+
   const periodTitle = current.combined
     ? `${monthName(year, current.from)} en ${monthName(year, current.from + 1)}`
     : monthName(year, month);
@@ -311,88 +318,83 @@ export default function BonusApp() {
         <p className="hidden text-sm text-muted sm:block">Haal ik mijn drempel als ik verlof neem?</p>
       </header>
 
-      {/* Uitkomst */}
-      {ready ? (
-        <section
-          aria-labelledby="uitkomst"
-          className={`mt-5 rounded-3xl p-5 transition-colors duration-500 sm:p-8 ${
-            ev.achieved ? "bg-ok-tint" : "bg-bad-tint"
-          }`}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => go(-1)} aria-label="Vorige maand"
-                className="size-11 rounded-full border border-ink/30 bg-white/70 text-lg hover:bg-white">←</button>
-              <h2 id="uitkomst" className="font-display min-w-44 text-center text-3xl font-bold capitalize sm:text-5xl">
-                {periodTitle}
-                <span className="sr-only"> {year}</span>
-              </h2>
-              <button type="button" onClick={() => go(1)} aria-label="Volgende maand"
-                className="size-11 rounded-full border border-ink/30 bg-white/70 text-lg hover:bg-white">→</button>
-            </div>
-            <p className="text-sm text-ink/80">{year}</p>
+      {/* Uitkomst: dezelfde opbouw en hoogte, ook als er nog gegevens ontbreken */}
+      <section
+        aria-labelledby="uitkomst"
+        className={`mt-5 rounded-3xl p-5 transition-colors duration-500 sm:p-8 ${
+          !ready ? "bg-accent-soft" : ev.achieved ? "bg-ok-tint" : "bg-bad-tint"
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => go(-1)} aria-label="Vorige maand"
+              className="size-11 rounded-full border border-ink/30 bg-white/70 text-lg hover:bg-white">←</button>
+            <h2 id="uitkomst" className="font-display min-w-44 text-center text-3xl font-bold capitalize sm:text-5xl">
+              {periodTitle}
+              <span className="sr-only"> {year}</span>
+            </h2>
+            <button type="button" onClick={() => go(1)} aria-label="Volgende maand"
+              className="size-11 rounded-full border border-ink/30 bg-white/70 text-lg hover:bg-white">→</button>
           </div>
+          <p className="text-sm text-ink/80">{year}</p>
+        </div>
 
-          <div role="status" aria-live="polite" className="mt-6 flex flex-wrap items-end justify-between gap-x-8 gap-y-2">
-            <p className={`font-display text-2xl font-semibold sm:text-3xl ${ev.achieved ? "text-ok" : "text-bad"}`}>
-              {ev.achieved ? "✓ Je haalt de drempel" : "✗ Je haalt de drempel niet"}
-            </p>
-            <p className="font-display tnum text-4xl font-bold sm:text-6xl">
-              {eur(ev.bonus)}
-              <span className="ml-2 text-base font-medium text-ink/80">bruto bonus</span>
-            </p>
-          </div>
+        <div role="status" aria-live="polite" className="mt-6 flex flex-wrap items-end justify-between gap-x-8 gap-y-2">
+          <p className={`font-display text-2xl font-semibold sm:text-3xl ${!ready ? "text-ink" : ev.achieved ? "text-ok" : "text-bad"}`}>
+            {!ready ? "Vul je gegevens in" : ev.achieved ? "✓ Je haalt de drempel" : "✗ Je haalt de drempel niet"}
+          </p>
+          <p className="font-display tnum text-4xl font-bold sm:text-6xl">
+            {ready ? eur(ev.bonus) : "€ –"}
+            <span className="ml-2 text-base font-medium text-ink/80">bruto bonus</span>
+          </p>
+        </div>
 
+        {ready ? (
           <Gauge hours={ev.hours} needed={ev.neededHours} ok={ev.achieved} />
+        ) : (
+          <div className="mt-8 h-5 rounded-full bg-white/80" aria-hidden="true" />
+        )}
 
-          <p className="mt-10 text-base sm:text-lg">
-            {ev.achieved
+        <p className="mt-10 min-h-14 text-base sm:min-h-8 sm:text-lg">
+          {!ready
+            ? `Nog nodig: ${missing.join(", ")}.`
+            : ev.achieved
               ? ev.extraLeaveDays > 0
                 ? `Je kunt nog ${ev.extraLeaveDays} extra verlofdag${ev.extraLeaveDays === 1 ? "" : "en"} nemen en je bonus houden.`
                 : "Je zit precies op de grens: nog één verlofdag en je mist de drempel."
               : `Je komt ${dec(ev.shortHours)} uur tekort. Haal ${ev.daysNeeded} verlofdag${ev.daysNeeded === 1 ? "" : "en"} uit je planning of werk extra om de drempel te halen.`}
-          </p>
+        </p>
 
-          <dl className="tnum mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-ink/20 pt-4 text-sm sm:grid-cols-4">
-            <div><dt className="text-muted">Declarabele uren</dt><dd className="text-lg font-semibold">{dec(ev.hours)} u</dd></div>
-            <div><dt className="text-muted">Nodig voor de drempel</dt><dd className="text-lg font-semibold">meer dan {dec(ev.neededHours)} u</dd></div>
-            <div><dt className="text-muted">Omzet</dt><dd className="text-lg font-semibold">{eur(ev.revenue)}</dd></div>
-            <div><dt className="text-muted">Drempel</dt><dd className="text-lg font-semibold">{eur(ev.threshold)}</dd></div>
-          </dl>
+        <dl className="tnum mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-ink/20 pt-4 text-sm sm:grid-cols-4">
+          <div><dt className="text-muted">Declarabele uren</dt><dd className="text-lg font-semibold">{ready ? `${dec(ev.hours)} u` : "–"}</dd></div>
+          <div><dt className="text-muted">Nodig voor de drempel</dt><dd className="text-lg font-semibold">{ready ? `meer dan ${dec(ev.neededHours)} u` : "–"}</dd></div>
+          <div><dt className="text-muted">Omzet</dt><dd className="text-lg font-semibold">{ready ? eur(ev.revenue) : "–"}</dd></div>
+          <div><dt className="text-muted">Drempel</dt><dd className="text-lg font-semibold">{ready ? eur(ev.threshold) : "–"}</dd></div>
+        </dl>
 
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            <span>{st.leaveDays} verlofdag{st.leaveDays === 1 ? "" : "en"} · {st.holidays} feestdag{st.holidays === 1 ? "" : "en"} op een werkdag</span>
-            {current.combined ? (
-              <button type="button" className={ghostBtn} onClick={() =>
-                setPairStart((p) => { const n = { ...p }; delete n[yearKey]; return n; })}>
-                Terug naar losse maanden
-              </button>
-            ) : (
-              <button type="button" className={ghostBtn} onClick={() => {
-                const start = month === 12 ? 11 : month; // binnen hetzelfde jaar
-                setPairStart((p) => ({ ...p, [yearKey]: start }));
-              }}>
-                {pair !== undefined ? "Verplaats 2-maandsregeling hierheen" : "Gebruik 2-maandsregeling (1× per jaar)"}
-              </button>
-            )}
-          </div>
-        </section>
-      ) : (
-        <section role="status" className="mt-5 rounded-3xl bg-accent-soft p-6 sm:p-8">
-          <h2 className="font-display text-2xl font-bold sm:text-4xl">Vul je gegevens in</h2>
-          <p className="mt-2 max-w-prose text-base">
-            Met je salaris, uren per week en uurtarief zie je hier meteen of je de drempel haalt. Kies ook
-            minstens één werkdag.
-          </p>
-        </section>
-      )}
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <span>{st.leaveDays} verlofdag{st.leaveDays === 1 ? "" : "en"} · {st.holidays} feestdag{st.holidays === 1 ? "" : "en"} op een werkdag</span>
+          {current.combined ? (
+            <button type="button" className={ghostBtn} onClick={() =>
+              setPairStart((p) => { const n = { ...p }; delete n[yearKey]; return n; })}>
+              Terug naar losse maanden
+            </button>
+          ) : (
+            <button type="button" disabled={!ready} className={`${ghostBtn} disabled:cursor-not-allowed disabled:opacity-50`} onClick={() => {
+              const start = month === 12 ? 11 : month; // binnen hetzelfde jaar
+              setPairStart((p) => ({ ...p, [yearKey]: start }));
+            }}>
+              {pair !== undefined ? "Verplaats 2-maandsregeling hierheen" : "Gebruik 2-maandsregeling (1× per jaar)"}
+            </button>
+          )}
+        </div>
+      </section>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_20rem]">
-        {ready && (
-          <section aria-labelledby="kalender" className="min-w-0 lg:order-1">
+        <section aria-labelledby="kalender" className="min-w-0 lg:order-1">
             <div className="flex items-end justify-between gap-3">
-              <h2 id="kalender" className="font-display text-xl font-semibold capitalize">
-                Verlof plannen in {monthName(year, month)}
+              <h2 id="kalender" className="font-display text-xl font-semibold">
+                Verlof plannen in <span className="capitalize">{monthName(year, month)}</span>
               </h2>
               <button type="button" onClick={clearMonth} className={ghostBtn}>Verlof wissen</button>
             </div>
@@ -439,7 +441,7 @@ export default function BonusApp() {
                       }`}>
                       <span className="text-sm font-semibold">{day}</span>
                       <span className={`tnum text-xs ${onLeave ? "text-white" : "text-muted"}`}>
-                        {onLeave ? "verlof" : `${dec(hpd)} u`}
+                        {onLeave ? "verlof" : hpd > 0 ? `${dec(hpd)} u` : ""}
                       </span>
                     </button>
                   );
@@ -452,15 +454,12 @@ export default function BonusApp() {
               <li className="flex items-center gap-1.5"><span className="hatch inline-block size-3 rounded-sm" />feestdag, niet declarabel</li>
             </ul>
           </section>
-        )}
 
-        <div className={`lg:border-l lg:border-line lg:pl-8 ${ready ? "lg:order-2" : "lg:col-span-2 lg:max-w-md lg:border-l-0 lg:pl-0"}`}>
+        <div className="lg:order-2 lg:border-l lg:border-line lg:pl-8">
           {form}
         </div>
       </div>
-
-      {ready && (
-        <section aria-labelledby="jaar" className="mt-12">
+      <section aria-labelledby="jaar" className="mt-12">
           <h2 id="jaar" className="font-display text-xl font-semibold">Jaaroverzicht {year}</h2>
           <p className="mt-1 text-sm text-muted">
             Elke balk toont je omzet ten opzichte van de drempel (streep). Verwachte bonus dit jaar:{" "}
@@ -478,14 +477,14 @@ export default function BonusApp() {
                     className={`w-full rounded-lg p-1.5 text-center hover:bg-surface ${m === month ? "bg-surface ring-2 ring-ink" : ""}`}>
                     <span className="relative block h-24 border-b border-line">
                       <span className="absolute inset-x-0 border-t border-dashed border-ink/60" style={{ bottom: `${100 / 1.6}%` }} />
-                      <span className={`absolute inset-x-1.5 bottom-0 rounded-t-sm transition-[height] duration-500 ${r.ev.achieved ? "bg-ok" : "bg-bad"}`}
+                      <span className={`absolute inset-x-1.5 bottom-0 rounded-t-sm transition-[height] duration-500 ${!ready ? "bg-line" : r.ev.achieved ? "bg-ok" : "bg-bad"}`}
                         style={{ height: `${h}%` }} />
                     </span>
                     <span className="mt-1 block text-xs font-semibold capitalize">
                       {new Date(Date.UTC(year, i, 1)).toLocaleDateString("nl-NL", { month: "short", timeZone: "UTC" })}
                     </span>
-                    <span className={`block text-xs ${r.ev.achieved ? "text-ok" : "text-bad"}`}>
-                      {r.ev.achieved ? "✓ gehaald" : "✗ niet"}
+                    <span className={`block text-xs ${!ready ? "text-muted" : r.ev.achieved ? "text-ok" : "text-bad"}`}>
+                      {!ready ? "–" : r.ev.achieved ? "✓ gehaald" : "✗ niet"}
                     </span>
                     {r.combined && <span className="block text-[11px] text-muted">2 mnd</span>}
                   </button>
@@ -494,7 +493,6 @@ export default function BonusApp() {
             })}
           </ul>
         </section>
-      )}
 
       <footer className="mt-12 max-w-prose text-xs text-muted">
         <p>
